@@ -9,3 +9,8 @@ def leer_datos():
 
     # Número de variables
     n_vars = int(input("¿Cuántas variables tiene la función objetivo? "))
+
+
+
+
+
