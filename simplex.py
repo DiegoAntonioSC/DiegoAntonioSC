@@ -11,6 +11,6 @@ def leer_datos():
     n_vars = int(input("¿Cuántas variables tiene la función objetivo? "))
 
 
-#prueba verificación de actualizacion tiempo real
+#prueba verificación de actualizacion tiempo real zzz
 
 
