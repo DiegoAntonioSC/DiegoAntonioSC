@@ -145,3 +145,61 @@ def leer_datos():
             var_names.append(f"aux{i}")
 
     return A_rows, b, var_names, basis, art_indices
+
+    #imprimimos la matriz de forma legible. 
+    def imprimir_tableau(A_rows, b, c, basis, var_names, titulo="Tabla")
+    #imprimimos la tabla actual: columnas (variables), filas (restricciones y RHS), muestra la base actual y el vector de costos reduciendolo en cada calculo 
+
+    m = len(A_rows)
+    nvars = len(var_names[0]) if m>0 else 0
+
+    # creamos el encabezado
+    print("\n" + "="*60)
+    print(f"{titulo:^60}")
+    print("="*60)
+
+    #creamos la fila de los nombre de las variables
+    encabezado = ["Base", "Cb", "R"] + var_names
+    print("{:>6} {:>8} {:>12}".format(encabezado[0], encabezado[1], encabezado[2]), end="")
+    for name in encabezado[3:]:
+        print(f"{name:>10}", end="")
+    print()
+
+    #calcularcalcular c_B
+    c_B = [c[idx]for  idx in basis]
+
+    #imprimimos cada fila de restricciones
+    for i, row in enumerate(A_rows):
+        base_var = var_names[basis[i]]
+        cb = c_B
+        Ri = b[i]
+        print(f"{base_var:>6} {cb:8.2f} {Ri:12.6g}", end="")
+        for val in row:
+            print(f"{val:10.4g}", end="")
+        print()
+
+        #realizamos el calculo dw Zj = c_B *(B^-1 * A) => usando filas creadas anteriormente (tabla) Zj_j = sum_i c_B[i]*A_rows[i][j]
+        Zj = [] #creamos una lista vacia
+        for j in range(nvars):
+            zj = sum(c_B[i]*A_rows[i][j] for i in range(m))
+            Zj.append(zj)
+        #calculamos los costos reducidos C_j - Zj
+        rc = [c[j] - Zj[j] for j in range(nvars)]
+        #imprimimos Zj y rc en dos filas separadas
+        print("-"*60)
+        print(f"{'Zj':>6} {'':>8} {'':>12}", end="")
+        for zj in Zj:
+            print(f"{zj:10.4g}", end="")
+        print()
+        print(f"{'cj-zj':>6} {'':8} {'':12}", end="")
+    for v in rc:
+        print(f"{v:10.4g}", end="")
+    print()
+    # imprimir valor actual de Z = sum(c_B * b)
+    Z_val = sum(c_B[i] * b[i] for i in range(m))
+    print("-"*60)
+    print(f"Valor actual de Z (según base actual) = {Z_val:10.6g}")
+    print("="*60 + "\n")
+    #aqui ya imprimos nuestro resultados, la creacion de la tabla y los resultados necesarios para el metodo simplex
+
+    
