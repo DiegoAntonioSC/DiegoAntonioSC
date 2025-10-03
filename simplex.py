@@ -6,10 +6,12 @@ import numpy as np
 from scipy.optimize import linprog
 
 # Función para solicitar los datos al usuario
-def leer_datos():
+def leer_problema():
     print("Método Simplex")
-    tipo = input("¿Desea maximizar o minimizar").strip().lower()
-
+    tipo = input("¿Desea maximizar o minimizar? (max/min): ").strip().lower()
+    while tipo not in ["maximizar", "minimizar"]:
+        print("Entrada no válida. Intente de nuevo.")
+        tipo = input("¿Desea maximizar o minimizar? (max/min): ").strip().lower()
     #Solicitamos el numero de variables // ejemplo dos productos, dos precios, dos costos, etc, 
     #en pocas palabras cuantos datos vamos a validar
     n = int(input("Ingresa el numero de variables:"))
@@ -22,7 +24,7 @@ def leer_datos():
         c.append(coef) # los datos ingresados los vamos colocando en la lista vacia (c) con el metodo append que sirve para agregar elementos a una lista, estos valores ya estan convertidos a float, con la linea anterior.
 
         #Si el usario desea maximizar, la libreria linprog entra en juego ya que va a minimizar, por lo que todo sera multiplicado por -1
-        if tipo == "maximizar": #validamos si es maximizar o minimizar
+        if tipo == "max": #validamos si es maximizar o minimizar
         c = [-ci for ci in c] #si es maximizar, todos los valores de la lista c se multiplican por -1
 
         #Solicitamos el numero de restricciones
@@ -202,4 +204,121 @@ def leer_datos():
     print("="*60 + "\n")
     #aqui ya imprimos nuestro resultados, la creacion de la tabla y los resultados necesarios para el metodo simplex
 
-    
+    #Ahora implementaremos el meotodo simplex, con varias iteracionmes, con pivoteo de Gauss-Jordan
+    #este metodo asume que las filas A_rows rpresentan B_inv * A de la tabla tranformada
+    # y b representa B_inv * b la cual indica que variable es basica por fila
+    def simplex(A_rows, b, c, basis, var_names, max_iters = MAX_ITERS, titulo_prefix = "Iter"):
+        #la solucion seria asi: ejecuta las iteracciones del metodo simplex para una maximizacion Z = c * x, partiendo la tabala dada anteriormente
+        #lo cual devuelve: 
+        #status: "optimal", "unbounded", "iteration_limit"
+        #x: vector solución (longitud = número total variables)
+        #Z_val: valor objetivo
+        #basis: base final
+        #A_rows, b (tabla final)
+
+        m =len(A_rows) #llamamos el numero de restrincciones y las guardamos
+        nvars = lent(A_rows[0]) if m>0 else len(c) # le colocamos como condicion si A_rowstiene al menos una fila que tome las columnas como su longitud, si no que tome la longitud del vector de c
+
+        #realizamos un ciclo for donde realiza cada iteracion, como punto clabe podemos utlizar un mas_iters el cual nos ayudara a no tener varias iteraciones infinitas o un ciclo for infinito
+        for it in range(1, max_iters+1):
+            #imprimimos la tabla actual
+            imprimir_tableau(A_rows, b, c, basis, var_names, titulo=f"{titulo_prefix} {it}")
+
+            #calcular costos reducidos de c_j - Zj
+            c_B = [c[idx] for idx in basis]
+            Zj = []
+            for j in range(nvars):
+                zj = sum[(c_B[i]*A_rows[i][j] for i in range(m)) for j in range(nvars)]
+                Zj.append(zj)
+            rc = [c[j] - Zj[j] for j in range(nvars)]
+
+        #Verificamos si la condicion es optima
+        entering = None #inicializamos la variable de entrada
+        max_rc = 0.0 #con la variable max_rc le pedimos que guarde el valor mayor al costo reducido
+        for j in range(nvars): #comenzamos un un ciclo for para que valide cada variable / valor encontrada
+            if rc[j] > max_rc + TOL: #en la codicion le pedidmos que si el valor de la variable es mayor al valor guardado en max_rc, gaurde el valor y actualice el indice con entering
+                max_rc = rc[j]
+                entering = j
+        if entering is None: #si no se encontro ningun valor mayor a cero, se concluye que la solucion es optima
+            #solucion optima encontrada
+            x = [0.0]*nvars
+            for i in range(m):
+                x[basis[i]] = b[i]
+            Z_val = sum(c_B[i]*b[i] for i in range(m))
+            return "optimal", x, Z_val, basis, A_rows, b
+
+            #si hay variable de entrada, realizamos un calculo de la variable de salida
+            ratios = [] #creamos una lista vacia para guardar los valores de las razones
+            for i in range(m):
+                a_ij = A_rows[i][entering]
+                if a_ij > TOL: #si el valor de la variable es mayor a cero, se calcula la razon, no aplican valores negativos
+                    ratio = b[i]/a_ij
+                    ratios.append((ratio, i)) #guardamos la razon y el indice de la fila en nuestra lista vacia
+            if not ratios: #si no se encontro ninguna razon positiva, el problema es ilimitado
+                return "unbounded", None, None, basis, A_rows, b
+            
+            # nuestro siguiente paso a seguir es escoger la fila pivote para una razon minima
+            ratios.sort(key=lambda x: (x[0], x[1])) #ordenamos la lista ratios / razones de menor a mayor
+            pivot_radio, pivot_row = ratios[0] #selecionamos la menor razon y su fila correspondiente (el pivot_radio es el valor minimo de la razon y pivot_row  indicara la fila pivote)
+            pivot_col = entering #pivot_col asigna la columna, a la variablke que entrara. 
+
+            #mostraremos que es loq ue pivotemos
+            prnt(f"Pivote seleccionado: colunba (Entrada) = {var_name[pivot_col]}, fila (Salida) = {var_names[basis[pivot_row]]}")
+            #realizamos la operacion Gauss-Jordan: pedimos normalizar la fila pivote y anulamos la columna en otras filas
+            pivot_val = A_rows[pivot_row][pivot_col] #guardamos el valor del pivote
+            #normalizamos la fila pivote dividiendo todos sus elementos por el valor del pivote
+            A_rows[pivot_row] = [val/pivot_val for val in A_rows[pivot_row]] #dividimos cada elemento de la fila pivote por el valor del pivote y pivote_val convierte el elemento pivoteen 1 y ajsuta el resto de las filas
+            b[pivot_row] = b[pivot_row] / pivot_val #dividimos el termino independiente RHS, de la fila a la que realizamos el pivote, por el valor pivote
+
+            #reducimos los valors de las otras filas i
+            for i in range(m): #realizamos un ciclo for para que itere en cada fila de todas la restrincciones
+                if i == pivot_row: #le colocamos una condicion donde si la fila es la pivote que normalizamos, no la tome en cuenta y salte a la otra
+                    continue
+                factor = A_rows[i][pivot_col] #obtenemos el valor del coeficiente de la variable que entra a la base de la columna pivote y el cual indica que valores hay en la restrinccion
+                if abs(factor) > TOL: #si el factor es mayor a cero, realizamos la operacion de reduccion
+                    A_rows[i] = [A_rows[i][j] - factor * A_rows[pivot_row][j] for j in range(nvars)] #actualizamo la fila restando el valor del factor por la fila pivote
+                    #actualizamos el valor del termino independiente RHS
+                    b[i] = b[i] - factor * b[pivot_row]
+
+            #actualizamos la base
+            basis[pivot_row] = pivot_col #la variable que entra a la base reemplaza a la que sale
+
+        #si se alcanza el maximo de iteraciones sin encontrar una solucion optima, se detiene el proceso
+        return "iteration_limit", None, None, basis, A_rows, b
+
+        #Creamos una funcion principal para integrar todas lo que fuimos pidiendo y crando para la solucion, estas osn_
+        # lectura, preporcesamiento, costruccion, simplex y postprocesamiento
+        def resolver_simplex_completo():
+
+        #realizamos la resolicoon completa, tomando: lectura, correccion de signos, creamos forma estandar, creamos la funcion objetivo, ejecutamos el metodo simplex, comprobamos variables artificiales. 
+
+        #leemos el problema ingresado por el usuario
+        tipo, c_origen, restricciones = leer_problema()
+
+        #solucion para resolver un problema de minimizacion
+        # si es minimizacion, convertimos a maximizacion multiplicando por -1
+        es_min = (tipo == "min")
+        if es_min:
+            c_for_algo = [-val for val in c_origen]
+        else:
+            c_for_algo = list(c_origen)
+
+        #volvemos repetir el procedimiento de la correccion de signos con los valores independientes (RHS)
+        restricciones = corregir_signo_restricciones(restricciones)
+
+        #costruimos la forma estandar con los datos obtenidos
+        A_rows, b, var_names, basis, art_indices = construir_forma_estandar(c_for_algo, restricciones)
+
+        #costruimso el vector c_big 
+        nvars = len(A_rows[0]) if A_rows else len(c_for_algo) #calculamos el numero total de las variables ingresada spor el usuario
+        c_big = [0.0] * nvars #creamos una lista de ceros dond evana  ser agregadas las variables ingresadas
+
+        #copiamos los coeficientes originales a las posiciones correctas
+        for i in range(len(c_for_algo)): #creamos un ciclo for para que itere en cada uno de los valores ingresados por el usuario
+            c_big[i] = c_for_algo[i]  #traemos cada coeficiente original y las colocamos al nuevo vector c_big, gracias esto mantenemos los valores de la holgura y exceso en cero
+            #para los valores artificiales los colocamos en un valor muy grande (M)
+        for idx in art_indices:
+            c_big[idx] = M
+
+        #mostramos los datos iniciales
+        
